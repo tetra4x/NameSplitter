@@ -21,11 +21,6 @@ public static class NameSplitEngine
     {
         if (!File.Exists(inputImagePath)) throw new FileNotFoundException("Input image not found.", inputImagePath);
         Directory.CreateDirectory(exportDirectory);
-        // Exportフォルダの内容をすべて削除
-        foreach (var file in Directory.GetFiles(exportDirectory))
-        {
-            try { File.Delete(file); } catch { }
-        }
 
         using var source = ImageLoader.LoadBitmap(inputImagePath);
 
@@ -556,7 +551,7 @@ public static class NameSplitEngine
         // テンプレート外枠のパディング分を除いた「コンテンツ幅」で推定する
         var contentWidth = Math.Max(0, canvasWidth - (paddingX * 2));
 
-        var candidates = new[] { 2, 4, 6, 8, 10, 12 };
+        var candidates = Enumerable.Range(2, 11).ToArray();
         var best = (pagesPerRow: 0, diff: int.MaxValue);
 
         foreach (var ppr in candidates)

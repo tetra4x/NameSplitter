@@ -29,7 +29,7 @@ public static class TemplateGenerator
     public static Bitmap GenerateFromSeparateTemplates(string templateLeftPath, string templateRightPath, TemplateSettings settings)
     {
         if (settings.TotalPages <= 0) throw new ArgumentOutOfRangeException(nameof(settings.TotalPages));
-        if (settings.PagesPerRow is not (2 or 4 or 6 or 8 or 10 or 12))
+        if (settings.PagesPerRow < 2 || settings.PagesPerRow > 12)
             throw new ArgumentOutOfRangeException(nameof(settings.PagesPerRow));
         if (settings.PageSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.PageSpacing));
         if (settings.RowSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.RowSpacing));
@@ -51,8 +51,10 @@ public static class TemplateGenerator
         var slots = settings.TotalPages + (settings.StartWithLeftPage ? 1 : 0);
         var rows = (int)Math.Ceiling(slots / (double)settings.PagesPerRow);
 
+        // ペア計算を奇数でも破綻しないよう修正
         var pairCountPerRow = settings.PagesPerRow / 2;
-        var pairGapsPerRow = Math.Max(0, pairCountPerRow - 1);
+        var singleCountPerRow = settings.PagesPerRow % 2;
+        var pairGapsPerRow = Math.Max(0, pairCountPerRow + singleCountPerRow - 1);
         var extraFirstSingleGap = settings.StartWithLeftPage ? 1 : 0;
 
         var contentWidth = (pageWidth * settings.PagesPerRow) + (settings.PageSpacing * (pairGapsPerRow + extraFirstSingleGap));
@@ -117,7 +119,7 @@ public static class TemplateGenerator
     public static Bitmap Generate(string templatePngPath, TemplateSettings settings)
     {
         if (settings.TotalPages <= 0) throw new ArgumentOutOfRangeException(nameof(settings.TotalPages));
-        if (settings.PagesPerRow is not (2 or 4 or 6 or 8 or 10 or 12))
+        if (settings.PagesPerRow < 2 || settings.PagesPerRow > 12)
             throw new ArgumentOutOfRangeException(nameof(settings.PagesPerRow));
         if (settings.PageSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.PageSpacing));
         if (settings.RowSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.RowSpacing));
@@ -129,25 +131,17 @@ public static class TemplateGenerator
 
         using var template = ImageLoader.LoadBitmap(templatePngPath);
 
-        // 旧実装は「template.png が2ページ分(見開き)」である前提で常に幅を半分にしていた。
-        // しかし実際の template.png が1ページ画像の場合、生成結果の横幅が想定より小さくなる。
-        // ここでは、画像が横長(幅 > 高さ)なら見開き、縦長なら1ページとして自動判定する。
         var isTwoPageTemplate = template.Width > template.Height;
-
         var pageWidth = isTwoPageTemplate ? template.Width / 2 : template.Width;
         var pageHeight = template.Height;
 
-        // 左ページ始まりの場合は先頭に1ページ分の空き(=スロットが1つ増える)
         var slots = settings.TotalPages + (settings.StartWithLeftPage ? 1 : 0);
         var rows = (int)Math.Ceiling(slots / (double)settings.PagesPerRow);
 
-        // 2ページ(見開き相当のペア)ごとにスペースを入れる。
-        // 例: PagesPerRow=6 ならペアは3つ、ペア間スペースは2つ。
+        // ペア計算を奇数でも破綻しないよう修正
         var pairCountPerRow = settings.PagesPerRow / 2;
-        var pairGapsPerRow = Math.Max(0, pairCountPerRow - 1);
-
-        // 左ページ始まりの場合は「先頭1ページの直後」にもスペースが入る。
-        // キャンバス幅としては、追加スペースは常に「1ページ目と2ページ目の間」なので 1 を加算する。
+        var singleCountPerRow = settings.PagesPerRow % 2;
+        var pairGapsPerRow = Math.Max(0, pairCountPerRow + singleCountPerRow - 1);
         var extraFirstSingleGap = settings.StartWithLeftPage ? 1 : 0;
 
         var contentWidth = (pageWidth * settings.PagesPerRow) + (settings.PageSpacing * (pairGapsPerRow + extraFirstSingleGap));
@@ -182,8 +176,6 @@ public static class TemplateGenerator
             g.DrawImage(template, new Rectangle(x, y, pageWidth, pageHeight), srcRect, GraphicsUnit.Pixel);
         }
 
-        // QRに埋め込むページサイズは「1ページ分」。
-        // (見開きテンプレの場合も 1ページ = 幅/2、高さ=そのまま)
         var payload = new TemplateQrPayload(
             PageWidth: pageWidth,
             PageHeight: pageHeight,
@@ -232,18 +224,17 @@ public static class TemplateGenerator
     internal static int GetPairGapsBeforeCol(int col, TemplateSettings settings)
     {
         // col は左→右の0始まり。
-        // 「2ページで1ペア」なので、ペア境界は (1,3,5,...) の列の次。
-        var gaps = 0;
-        for (var leftCol = 0; leftCol < col; leftCol++)
+        // ペア間スペースを奇数でも破綻しないよう修正
+        int pairGaps = 0;
+        for (int leftCol = 0; leftCol < col; leftCol++)
         {
-            if (leftCol % 2 == 1) gaps++;
+            // ペアの右側（1,3,5...）または最後のページ（奇数行の最後）
+            if (leftCol % 2 == 1 || (settings.PagesPerRow % 2 == 1 && leftCol == settings.PagesPerRow - 2))
+                pairGaps++;
         }
-
-        // 左ページ始まりの場合、先頭の「空き1ページ」の直後にもスペースが入れる。
         if (settings.StartWithLeftPage && col >= 1)
-            gaps++;
-
-        return gaps;
+            pairGaps++;
+        return pairGaps;
     }
 
     private static void DrawCornerMarkers(Graphics g, int canvasWidth, int canvasHeight)

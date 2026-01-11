@@ -215,8 +215,8 @@ internal sealed class WinFormsTemplateTab
 
     private void Build()
     {
-        _cmbPagesPerRow.Items.AddRange(["2", "4", "6", "8", "10", "12"]);
-        _cmbPagesPerRow.SelectedIndex = 2; // 6
+        _cmbPagesPerRow.Items.AddRange(Enumerable.Range(2, 11).Select(i => i.ToString()).ToArray());
+        _cmbPagesPerRow.SelectedIndex = 4; // デフォルト6
 
         _cmbOutputFormat.Items.AddRange(["png", "jpg"]);
 

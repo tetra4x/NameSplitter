@@ -29,7 +29,7 @@ public static class MultiImageTemplateGenerator
         if (settings.TotalPages != pageImagePaths.Count)
             throw new InvalidOperationException($"総ページ数({settings.TotalPages})と画像枚数({pageImagePaths.Count})が一致しません。");
 
-        if (settings.PagesPerRow is not (2 or 4 or 6 or 8 or 10 or 12))
+        if (settings.PagesPerRow < 2 || settings.PagesPerRow > 12)
             throw new ArgumentOutOfRangeException(nameof(settings.PagesPerRow));
         if (settings.PageSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.PageSpacing));
         if (settings.RowSpacing < 0) throw new ArgumentOutOfRangeException(nameof(settings.RowSpacing));
